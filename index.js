@@ -19,10 +19,11 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
-// middleware:
-app.use(express.urlencoded({ extended: true })); // handle normal forms -> url encoded
-app.use(express.json()); // Handle raw json data
+// Serve static files from the /uploads directory
+app.use('/uploads', express.static('uploads'));
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "views", "index.html"));
@@ -58,10 +59,9 @@ app
 app.get("/fetch-single", (req, res) => {
   let upload_dir = path.join(__dirname, "uploads");
 
-  // NOTE: This reads the directory, not the file, so think about how you can use this for the assignment
   let uploads = fs.readdirSync(upload_dir);
   console.log(uploads);
-  // Add error handling
+
   if (uploads.length == 0) {
     return res.status(503).send({
       message: "No images",
@@ -80,20 +80,75 @@ app.get("/single", (req, res) => {
   res.sendFile(path.join(__dirname, "views", "single.html"));
 });
 
-/*
-Need to be implemented:
-You can rename these routes as you need
 
+//Fetch Multiple
+app.get("/fetch-multiple", (req, res) => {
+  let upload_dir = path.join(__dirname, "uploads");
 
-/multiple: handle a webpage to grab multiple random images from the server
-/fetch-multiple - This route will grab the multiple photos for the webpage multiple
+  let uploads = fs.readdirSync(upload_dir);
+  console.log(uploads);
+  if (uploads.length == 0) {
+    return res.status(503).send({
+      message: "No images",
+    });
+  }
 
-/gallery - showcases all images from the server
-/fetch-all - Grab all items from the upload folder
+  let selectedImages = [];
+  for (let i = 0; i < 3; i++) {
+    let index = Math.floor(Math.random() * uploads.length);
+    selectedImages.push(path.join('/uploads', uploads[index]));
+    uploads.splice(index, 1);
+  }
 
-/gallery-pagination - showcase all images from the server, using pagination
-/fetch-all-pagination/pages/:index
-*/
+  res.json(selectedImages);
+});
+
+app.get("/multiple", (req, res) => {
+  res.sendFile(path.join(__dirname, "views", "multiple.html"));
+});
+
+// Gallery page
+app.get("/gallery", (req, res) => {
+  res.sendFile(path.join(__dirname, "views", "gallery.html"));
+});
+
+app.get("/fetch-all-images", (req, res) => {
+  let uploadDir = path.join(__dirname, "uploads");
+
+  fs.readdir(uploadDir, (err, files) => {
+      if (err) {
+          console.error("Error reading uploads directory:", err);
+          return res.status(500).send("Internal Server Error");
+      }
+
+      const imagePaths = files.map(file => path.join('/uploads', file));
+      res.json(imagePaths);
+  });
+});
+
+// Gallery with pagination
+app.get("/gallery-pagination", (req, res) => {
+  res.sendFile(path.join(__dirname, "views", "gallery-pagination.html"));
+});
+
+app.get("/fetch-all-pagination/pages/:index", (req, res) => {
+  const index = parseInt(req.params.index);
+  const pageSize = 5; // Number of images per page
+  const startIndex = index * pageSize;
+  const endIndex = startIndex + pageSize;
+  let uploadDir = path.join(__dirname, "uploads");
+
+  fs.readdir(uploadDir, (err, files) => {
+      if (err) {
+          console.error("Error reading uploads directory:", err);
+          return res.status(500).send("Internal Server Error");
+      }
+
+      const paginatedFiles = files.slice(startIndex, endIndex);
+      const imagePaths = paginatedFiles.map(file => path.join('/uploads', file));
+      res.json(imagePaths);
+  });
+});
 
 // catch all other requests
 app.use((req, res) => {
